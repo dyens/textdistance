@@ -1,4 +1,3 @@
-use std::cmp::Eq;
 /// Compute the Hamming distance between the two or more sequences.
 
 /// Calculates the Hamming distance between two strings of equal length.
@@ -24,31 +23,66 @@ use std::cmp::Eq;
 ///
 ///https://github.com/life4/textdistance/blob/master/textdistance/algorithms/edit_based.py#L33
 ///https://github.com/mbrlabs/distance/blob/master/src/hamming.rs
+use crate::error::{TextDistanceError, ValueError};
+use std::cmp::Eq;
 
-pub fn hamming<T>(s1: T, s2: T) -> u32
+fn _hamming<T>(x: T, y: T) -> u32
 where
     T: IntoIterator,
     T::Item: Eq,
 {
     let mut distance = 0;
-    for (s1_el, s2_el) in s1.into_iter().zip(s2) {
-        if s1_el != s2_el {
+    for (x_el, y_el) in x.into_iter().zip(y) {
+        if x_el != y_el {
             distance += 1;
         }
     }
     distance
 }
 
+pub trait Hamming<Rhs = Self> {
+    fn hamming(&self, other: &Rhs) -> Result<u32, TextDistanceError>;
+}
+
+impl<T> Hamming for Vec<T>
+where
+    T: Eq,
+{
+    fn hamming(&self, other: &Vec<T>) -> Result<u32, TextDistanceError> {
+        if self.len() != other.len() {
+            ValueError::new("Lengths not equal");
+        }
+        Ok(_hamming(self, other))
+    }
+}
+
+impl Hamming for &str {
+    fn hamming(&self, other: &&str) -> Result<u32, TextDistanceError> {
+        if self.chars().count() != other.chars().count() {
+            return Err(ValueError::new("Lengths not equal"));
+        }
+        Ok(_hamming(self.chars(), other.chars()))
+    }
+}
+
+impl Hamming for String {
+    fn hamming(&self, other: &String) -> Result<u32, TextDistanceError> {
+        (&self[..]).hamming(&&other[..])
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::hamming;
+    use super::Hamming;
 
     #[test]
-    fn basic() {
-        assert_eq!(0, hamming("sitting".chars(), "sitting".chars()));
-        assert_eq!(7, hamming("abcdefg".chars(), "hijklmn".chars()));
-        assert_eq!(3, hamming("karolin".chars(), "kathrin".chars()));
-        assert_eq!(4, hamming("hello".chars(), "world".chars()));
-        assert_eq!(1, hamming("Rust".chars(), "rust".chars()));
+    fn test_str_slice() {
+        let x = "abc";
+        let y = "abd";
+        assert_eq!(x.hamming(&y).unwrap(), 1);
+        let x = "abcc";
+        let y = "abd";
+        assert_eq!(x.hamming(&y).unwrap(), 1);
+        assert_eq!(x.hamming(&y).is_err(), true);
     }
 }
