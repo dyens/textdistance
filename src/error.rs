@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt;
 
 #[derive(Debug)]
@@ -10,6 +11,12 @@ impl ValueError {
         ValueError {
             details: msg.to_string(),
         }
+    }
+}
+
+impl error::Error for ValueError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
     }
 }
 
@@ -29,6 +36,12 @@ impl TextDistanceError {
         TextDistanceError {
             details: msg.to_string(),
         }
+    }
+}
+
+impl error::Error for TextDistanceError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
     }
 }
 

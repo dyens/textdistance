@@ -26,7 +26,7 @@
 use crate::error::{TextDistanceError, ValueError};
 use std::cmp::Eq;
 
-fn _hamming<T>(x: T, y: T) -> u32
+fn _hamming<T>(x: T, y: T) -> u64
 where
     T: IntoIterator,
     T::Item: Eq,
@@ -40,49 +40,123 @@ where
     distance
 }
 
-pub trait Hamming<Rhs = Self> {
-    fn hamming(&self, other: &Rhs) -> Result<u32, TextDistanceError>;
-}
-
-impl<T> Hamming for Vec<T>
+fn hamming_on_slices<T>(x: &[T], y: &[T]) -> u64
 where
     T: Eq,
 {
-    fn hamming(&self, other: &Vec<T>) -> Result<u32, TextDistanceError> {
-        if self.len() != other.len() {
-            ValueError::new("Lengths not equal");
-        }
-        Ok(_hamming(self, other))
+    if x.len() != y.len() {
+        return 0;
+    }
+    _hamming(x, y)
+}
+
+fn hamming_on_str(x: &str, y: &str) -> u64 {
+    if x.chars().count() != y.chars().count() {
+        return 0;
+    }
+    _hamming(x.chars(), y.chars())
+}
+
+#[allow(non_camel_case_types)]
+pub struct hamming;
+
+impl<T> FnOnce<(&[T], &[T])> for hamming
+where
+    T: Eq,
+{
+    type Output = u64;
+    #[inline(always)]
+    extern "rust-call" fn call_once(self, args: (&[T], &[T])) -> Self::Output {
+        hamming_on_slices.call_once(args)
     }
 }
 
-impl Hamming for &str {
-    fn hamming(&self, other: &&str) -> Result<u32, TextDistanceError> {
-        if self.chars().count() != other.chars().count() {
-            return Err(ValueError::new("Lengths not equal"));
-        }
-        Ok(_hamming(self.chars(), other.chars()))
+impl<T> FnOnce<(&Vec<T>, &Vec<T>)> for hamming
+where
+    T: Eq,
+{
+    type Output = u64;
+    #[inline(always)]
+    extern "rust-call" fn call_once(self, args: (&Vec<T>, &Vec<T>)) -> Self::Output {
+        hamming_on_slices.call_once((&args.0[..], &args.1[..]))
     }
 }
 
-impl Hamming for String {
-    fn hamming(&self, other: &String) -> Result<u32, TextDistanceError> {
-        (&self[..]).hamming(&&other[..])
+impl FnOnce<(&str, &str)> for hamming {
+    type Output = u64;
+    #[inline(always)]
+    extern "rust-call" fn call_once(self, args: (&str, &str)) -> Self::Output {
+        hamming_on_str.call_once(args)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::Hamming;
-
-    #[test]
-    fn test_str_slice() {
-        let x = "abc";
-        let y = "abd";
-        assert_eq!(x.hamming(&y).unwrap(), 1);
-        let x = "abcc";
-        let y = "abd";
-        assert_eq!(x.hamming(&y).unwrap(), 1);
-        assert_eq!(x.hamming(&y).is_err(), true);
+impl FnOnce<(&String, &String)> for hamming {
+    type Output = u64;
+    #[inline(always)]
+    extern "rust-call" fn call_once(self, args: (&String, &String)) -> Self::Output {
+        hamming_on_str.call_once((&args.0, &args.1))
     }
 }
+
+impl FnOnce<(u32, u32)> for hamming {
+    type Output = u64;
+    #[inline(always)]
+    extern "rust-call" fn call_once(self, args: (u32, u32)) -> Self::Output {
+        3
+    }
+}
+
+// impl FnOnce<(&str, &str)> for hamming {
+//     type Output = u64;
+//     #[inline(always)]
+//     extern "rust-call" fn call_once(self, args: (&str, &str)) -> Self::Output {
+//         hamming_on_str.call_once(args)
+//     }
+// }
+
+// // pub trait Hamming<Rhs = Self> {
+//     fn hamming(&self, other: &Rhs) -> Result<u32, TextDistanceError>;
+// }
+
+// impl<T> Hamming for Vec<T>
+// where
+//     T: Eq,
+// {
+//     fn hamming(&self, other: &Vec<T>) -> Result<u32, TextDistanceError> {
+//         if self.len() != other.len() {
+//             ValueError::new("Lengths not equal");
+//         }
+//         Ok(_hamming(self, other))
+//     }
+// }
+
+// impl Hamming for &str {
+//     fn hamming(&self, other: &&str) -> Result<u32, TextDistanceError> {
+//         if self.chars().count() != other.chars().count() {
+//             return Err(TextDistanceError::new("Lengths not equal"));
+//         }
+//         Ok(_hamming(self.chars(), other.chars()))
+//     }
+// }
+
+// impl Hamming for String {
+//     fn hamming(&self, other: &String) -> Result<u32, TextDistanceError> {
+//         (&self[..]).hamming(&&other[..])
+//     }
+// }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::Hamming;
+
+//     #[test]
+//     fn test_str_slice() {
+//         let x = "abc";
+//         let y = "abd";
+//         assert_eq!(x.hamming(&y).unwrap(), 1);
+//         let x = "abcc";
+//         let y = "abd";
+//         assert_eq!(x.hamming(&y).unwrap(), 1);
+//         assert_eq!(x.hamming(&y).is_err(), true);
+//     }
+// }
